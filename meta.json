@@ -1,0 +1,10 @@
+{
+  "source": "api",
+  "fetchedAt": "2026-11-17T05:15:16.428Z",
+  "counts": {
+    "refrigerator": 5583,
+    "kimchi-refrigerator": 4060,
+    "air-purifier": 2339
+  },
+  "prevCounts": null
+}
