@@ -83,10 +83,16 @@ for (const { cat, models, bins, stats } of data) {
     sitemaps.push(name);
   }
 
-  summary.push({ cat, ...stats, grade1: gradeCounts[1] || 0, paged: models.filter((m) => m.hasPage).length });
+  summary.push({ cat, ...stats, gradeCounts, grade1: gradeCounts[1] || 0, paged: models.filter((m) => m.hasPage).length });
 }
 
-writeText(path.join(dist, 'index.html'), homePage(summary, baseUrl, meta.fetchedAt));
+// 홈 예시: 품목마다 가장 최근에 출하된 1등급 모델 하나
+const examples = data
+  .map(({ cat, models }) => models.find((m) => m.hasPage && m.grade === 1))
+  .filter(Boolean)
+  .map((m) => ({ cat: data.find((d) => d.models.includes(m)).cat.slug, slug: m.slug, model: m.model }));
+
+writeText(path.join(dist, 'index.html'), homePage(summary, baseUrl, meta.fetchedAt, examples));
 writeText(path.join(dist, 'guide', 'label-cost', 'index.html'), guidePage(baseUrl));
 writeText(path.join(dist, '404.html'), notFoundPage(baseUrl));
 

@@ -120,6 +120,19 @@ export function normalizeCategory(cat, rows) {
     });
     const mid = list[Math.floor(list.length / 2)];
     list.forEach((m) => (m.binMedian = mid.metric));
+
+    // 분포 히스토그램 (상위 2% 긴 꼬리는 마지막 칸에 모음)
+    const n = 28;
+    const lo = list[0].metric;
+    const hi = list[Math.min(list.length - 1, Math.floor(list.length * 0.98))].metric;
+    const counts = new Array(n).fill(0);
+    const idx = (v) => (hi > lo ? Math.min(n - 1, Math.max(0, Math.floor(((v - lo) / (hi - lo)) * n))) : 0);
+    list.forEach((m) => counts[idx(m.metric)]++);
+    const hist = { lo, hi, counts, clamped: list[list.length - 1].metric > hi };
+    list.forEach((m) => {
+      m.hist = hist;
+      m.histIdx = idx(m.metric);
+    });
   }
 
   const emptyCount = models.filter((m) => m.grade === null || m.metric === null).length;
