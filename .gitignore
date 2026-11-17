@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.build/
+.wrangler/
+# 원본 스냅샷은 data 브랜치에 보관 (main 에는 올리지 않음)
+data/
+fixtures/raw/
+.env
+.dev.vars

@@ -1,0 +1,213 @@
+[
+  {
+    "slug": "refrigerator",
+    "op": "EEP_20_LIST",
+    "enabled": true,
+    "name": "냉장고",
+    "official": "전기냉장고",
+    "capacity": {
+      "field": "CAPA",
+      "label": "용량",
+      "unit": "L",
+      "bins": [
+        200,
+        300,
+        400,
+        500,
+        600,
+        800
+      ]
+    },
+    "energy": {
+      "field": "MONTH_CONS_PWR",
+      "label": "월간소비전력량",
+      "unit": "kWh/월",
+      "model": "monthly_kwh"
+    },
+    "extra": []
+  },
+  {
+    "slug": "kimchi-refrigerator",
+    "op": "EEP_13_LIST",
+    "enabled": true,
+    "name": "김치냉장고",
+    "official": "김치냉장고",
+    "capacity": {
+      "field": "KIMCHI_AVAIL_CAPA",
+      "label": "김치저장실 유효내용적",
+      "unit": "L",
+      "bins": [
+        100,
+        200,
+        300,
+        400,
+        500
+      ]
+    },
+    "energy": {
+      "field": "MONTH_CONS_PWR",
+      "label": "월간소비전력량",
+      "unit": "kWh/월",
+      "model": "monthly_kwh"
+    },
+    "extra": [
+      {
+        "field": "R",
+        "label": "소비효율등급부여지표",
+        "unit": ""
+      }
+    ]
+  },
+  {
+    "slug": "air-conditioner",
+    "op": "EEP_24_LIST",
+    "enabled": false,
+    "note": "2026-11-17 확인: EEP_24·28 빈 응답(HTTP 200, 0B). 경로·필드 미검증",
+    "name": "에어컨",
+    "official": "전기냉방기",
+    "capacity": {
+      "field": "CAPA",
+      "label": "정격냉방능력",
+      "unit": "W",
+      "bins": [
+        3000,
+        5000,
+        7000,
+        9000,
+        12000,
+        16000
+      ]
+    },
+    "energy": {
+      "field": "MONTH_CONS_PWR1",
+      "label": "냉방기간 월간소비전력량",
+      "unit": "kWh/월",
+      "model": "monthly_kwh",
+      "seasonal": true
+    },
+    "extra": [
+      {
+        "field": "EFFIC1",
+        "label": "냉방기간 에너지소비효율(CSPF)",
+        "unit": "W/W"
+      },
+      {
+        "field": "MONTH_CONS_PWR2",
+        "label": "냉방기간 월간소비전력량(1:2 기준)",
+        "unit": "kWh/월"
+      },
+      {
+        "field": "EFFIC2",
+        "label": "냉방기간 에너지소비효율(1:2 기준)",
+        "unit": "W/W"
+      }
+    ]
+  },
+  {
+    "slug": "washer-drum",
+    "op": "EEP_06_LIST",
+    "enabled": false,
+    "note": "2026-11-17 확인: EEP_01·06 정상 응답이나 0건. 경로·필드 미검증",
+    "name": "드럼세탁기",
+    "official": "전기세탁기(드럼)",
+    "capacity": {
+      "field": "STANDARD_CAPA",
+      "label": "표준세탁용량",
+      "unit": "kg",
+      "bins": [
+        9,
+        12,
+        15,
+        19,
+        22
+      ]
+    },
+    "energy": {
+      "field": "CONS_PWR",
+      "label": "1회 세탁 소비전력량",
+      "unit": "Wh/회",
+      "model": "wh_per_cycle"
+    },
+    "extra": [
+      {
+        "field": "R",
+        "label": "소비효율등급부여지표",
+        "unit": ""
+      },
+      {
+        "field": "CLASS_CODE",
+        "label": "네트워크 기능",
+        "unit": "",
+        "text": true
+      }
+    ]
+  },
+  {
+    "slug": "tv",
+    "op": "EEP_17_LIST",
+    "enabled": false,
+    "note": "2026-11-17 확인: EEP_17 SERVICETIMEOUT(504). 경로·필드 미검증",
+    "name": "TV",
+    "official": "텔레비전수상기",
+    "capacity": {
+      "field": "DIAGO_LENGTH",
+      "label": "화면 대각선 길이",
+      "unit": "cm",
+      "bins": [
+        82,
+        110,
+        140,
+        165,
+        190,
+        215
+      ],
+      "inch": true
+    },
+    "energy": {
+      "field": "R",
+      "label": "소비전력",
+      "unit": "W",
+      "model": "watt"
+    },
+    "extra": [
+      {
+        "field": "DISPLAY",
+        "label": "디스플레이 방식",
+        "unit": "",
+        "text": true
+      }
+    ]
+  },
+  {
+    "slug": "air-purifier",
+    "op": "EEP_08_LIST",
+    "enabled": true,
+    "name": "공기청정기",
+    "official": "공기청정기",
+    "capacity": {
+      "field": "STANDARD_CONS_AREA",
+      "label": "표준사용면적",
+      "unit": "㎡",
+      "bins": [
+        20,
+        40,
+        60,
+        80,
+        100
+      ]
+    },
+    "energy": {
+      "field": "CONS_PWR",
+      "label": "면적당 소비전력",
+      "unit": "W/㎡",
+      "model": "watt_per_area"
+    },
+    "extra": [
+      {
+        "field": "WAIT_PWR",
+        "label": "대기전력",
+        "unit": "W"
+      }
+    ]
+  }
+]

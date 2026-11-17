@@ -1,0 +1,20 @@
+{
+  "name": "가전효율사전",
+  "tagline": "모델명으로 찾는 에너지등급·소비전력·전기요금",
+  "defaultUrl": "https://example.pages.dev",
+  "apiBase": "https://apis.data.go.kr/B553530/eep",
+  "labelRateWonPerKwh": 160,
+  "maxModelPages": 18000,
+  "fileLimit": 19500,
+  "listPageSize": 200,
+  "minShipYear": null,
+  "check": {
+    "maxEmptyRatio": 0.3,
+    "maxCountDropRatio": 0.2
+  },
+  "usageDefaults": {
+    "cyclesPerMonth": 20,
+    "tvHoursPerDay": 5,
+    "purifierHoursPerDay": 12
+  }
+}

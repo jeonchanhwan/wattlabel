@@ -1,0 +1,76 @@
+name: 주간 수집·빌드·배포
+
+on:
+  schedule:
+    - cron: "0 19 * * 0" # 매주 월요일 04:00 KST (UTC 일요일 19:00)
+  workflow_dispatch:
+    inputs:
+      skip_fetch:
+        description: "수집을 건너뛰고 data 브랜치의 기존 스냅샷으로 다시 빌드"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150 # API 응답이 호출당 약 16초. 3개 품목 수집에 약 30분
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 원본 스냅샷은 data 브랜치에 보관한다. 없으면 빈 브랜치로 시작.
+      - name: data 브랜치 준비
+        run: |
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch origin data
+            git worktree add data origin/data
+          else
+            git worktree add --detach data
+            cd data
+            git checkout --orphan data
+            git rm -rfq .
+          fi
+
+      - name: 수집
+        if: ${{ !inputs.skip_fetch }}
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: node scripts/fetch.mjs
+
+      - name: 스냅샷 커밋
+        if: ${{ !inputs.skip_fetch }}
+        run: |
+          cd data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A raw meta.json
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -qm "data: $(date -u +%F) 스냅샷"
+            git push origin HEAD:data
+          fi
+
+      - name: 빌드
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: node scripts/build.mjs
+
+      - name: 검사 (파일 수·빈 값·급감)
+        run: node scripts/check.mjs
+
+      - name: Cloudflare Pages 배포
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy dist --project-name="${{ vars.CF_PAGES_PROJECT }}" --branch=main --commit-dirty=true
