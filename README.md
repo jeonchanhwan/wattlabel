@@ -80,7 +80,7 @@ npm run preview  # http://localhost:8788
 1. GitHub에 빈 저장소를 만들고 이 폴더를 push 한다.
 2. Cloudflare Pages 프로젝트를 만든다: `npx wrangler login` 후 `npx wrangler pages project create <프로젝트명> --production-branch=main`
 3. Cloudflare 대시보드에서 "Cloudflare Pages: Edit" 권한의 API 토큰을 만든다.
-4. GitHub 저장소 Settings → Secrets and variables → Actions 에 등록한다.
+4. GitHub 저장소 Settings → **Secrets and variables → Actions** 에 등록한다. (Environments 가 아님)
 
 | 종류 | 이름 | 값 |
 |---|---|---|

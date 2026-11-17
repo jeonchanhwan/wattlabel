@@ -14,7 +14,6 @@ function toRecord(cat, row) {
     lab: cleanText(row.TEST_ORG_TERM),
     origin: cleanText(row.HPRO_YN_NM),
     ship: parseDate(row.SHIP_PRARG_DD),
-    reg: parseDate(row.DATA_REG_DT),
     grade: grade !== null && grade >= 1 && grade <= 5 ? Math.round(grade) : null,
     cap: parseNum(row[cat.capacity.field]),
     metric: parseNum(row[cat.energy.field]),
@@ -22,7 +21,8 @@ function toRecord(cat, row) {
   };
 }
 
-const sortDate = (r) => r.ship || r.reg || '0000-00-00';
+// DATA_REG_DT 는 실제 등록일이 아니라 API 조회 시각이 들어온다(2026-11-17 확인). 정렬에 쓰지 않는다.
+const sortDate = (r) => r.ship || '0000-00-00';
 
 export function binIndex(cat, cap) {
   if (cap === null) return -1;

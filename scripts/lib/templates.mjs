@@ -4,6 +4,14 @@ import { binLabel, monthlyKwh } from './normalize.mjs';
 const RATE = site.labelRateWonPerKwh;
 const U = site.usageDefaults;
 
+/** 순위를 '상위 n%' 또는 하위권이면 '하위 n%' 로 표현 */
+const rankText = (m) => {
+  const top = Math.max(1, Math.ceil((m.rank / m.binSize) * 100));
+  if (top <= 50) return `상위 ${top}%`;
+  const bottom = Math.max(1, Math.ceil(((m.binSize - m.rank + 1) / m.binSize) * 100));
+  return `하위 ${bottom}%`;
+};
+
 const gradeBadge = (g, big = false) =>
   g === null
     ? `<span class="grade grade-none${big ? ' grade-big' : ''}">등급 정보 없음</span>`
@@ -81,13 +89,12 @@ function summarySentences(cat, m) {
     out.push(`${cat.energy.label}은 ${fmt(m.metric, 2)}${cat.energy.unit}${m.cap !== null ? `, ${cat.capacity.label}은 ${capText(cat, m.cap)}` : ''}입니다.`);
   }
   if (m.rank && m.binSize >= 5) {
-    const pct = Math.max(1, Math.ceil((m.rank / m.binSize) * 100));
     const diff = m.metric - m.binMedian;
     const cmp =
       Math.abs(diff) < 1e-9
         ? '구간 중앙값과 같습니다'
         : `구간 중앙값(${fmt(m.binMedian, 2)}${cat.energy.unit})보다 ${fmt(Math.abs(diff), 2)}${cat.energy.unit} ${diff < 0 ? '적게' : '많이'} 씁니다`;
-    out.push(`같은 ${binLabel(cat, m.bin)} 구간 ${m.binSize.toLocaleString('ko-KR')}개 모델 중 ${m.rank.toLocaleString('ko-KR')}위(상위 ${pct}%)이며, ${cmp}.`);
+    out.push(`같은 ${binLabel(cat, m.bin)} 구간 ${m.binSize.toLocaleString('ko-KR')}개 모델 중 ${m.rank.toLocaleString('ko-KR')}위(${rankText(m)})이며, ${cmp}.`);
   }
   return out;
 }
@@ -150,7 +157,7 @@ export function modelPage(cat, m, alts, baseUrl, fetchedAt) {
     m.grade !== null ? `에너지소비효율 ${m.grade}등급` : null,
     m.metric !== null ? `${cat.energy.label} ${fmt(m.metric, 2)}${cat.energy.unit}` : null,
     kwh !== null ? `${cat.energy.seasonal ? '냉방기간 월' : '월'} 전기요금 약 ${won(kwh * RATE)}` : null,
-    pct ? `동급 상위 ${pct}%` : null,
+    pct ? `동급 ${rankText(m)}` : null,
   ].filter(Boolean);
 
   const extraRows = cat.extra
@@ -167,8 +174,8 @@ export function modelPage(cat, m, alts, baseUrl, fetchedAt) {
   const rankBlock = m.rank
     ? `<section>
   <h2>같은 급 안에서의 순위</h2>
-  <p><strong>${esc(binLabel(cat, m.bin))}</strong> 구간 ${m.binSize.toLocaleString('ko-KR')}개 모델 중 <strong>${m.rank.toLocaleString('ko-KR')}위</strong> (${esc(cat.energy.label)}이 낮은 순, 상위 ${pct}%)</p>
-  <div class="bar" role="img" aria-label="상위 ${pct}%"><i style="left:${Math.min(98, Math.max(0, pct - 1))}%"></i></div>
+  <p><strong>${esc(binLabel(cat, m.bin))}</strong> 구간 ${m.binSize.toLocaleString('ko-KR')}개 모델 중 <strong>${m.rank.toLocaleString('ko-KR')}위</strong> (${esc(cat.energy.label)}이 낮은 순, ${rankText(m)})</p>
+  <div class="bar" role="img" aria-label="${rankText(m)}"><i style="left:${Math.min(98, Math.max(0, pct - 1))}%"></i></div>
   <div class="bar-legend"><span>적게 씀</span><span>많이 씀</span></div>
 </section>`
     : '';
