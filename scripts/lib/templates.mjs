@@ -46,10 +46,12 @@ const MARK = `<svg class="mark" viewBox="0 0 22 20" aria-hidden="true">${[0, 1, 
   .join('')}</svg>`;
 
 function searchBox(variant) {
-  const ph = variant === 'hero' ? '모델명을 입력하세요. 일부만 입력해도 됩니다' : '모델명 검색';
+  const ph = variant === 'hero' ? '모델명을 입력하세요' : '모델명 검색';
   return `<div class="search search-${variant}" role="search">
   <label class="sr" for="q">모델명 검색</label>
+  <svg class="search-ico" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.75" fill="none" stroke="currentColor" stroke-width="2"/><path d="m13 13 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   <input type="search" id="q" placeholder="${ph}" autocomplete="off" spellcheck="false">
+  ${variant === 'top' ? '<kbd class="search-kbd" aria-hidden="true">/</kbd>' : ''}
   <div id="results" class="results" role="listbox" hidden></div>
 </div>`;
 }
@@ -71,9 +73,8 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#eceff1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d1317" media="(prefers-color-scheme: dark)">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css">
 <link rel="stylesheet" href="/assets/style.css?v=${ASSET_VER}">
 <script src="/assets/app.js?v=${ASSET_VER}" defer></script>
 </head>
@@ -259,7 +260,7 @@ export function modelPage(cat, m, alts, baseUrl, fetchedAt) {
   <div class="mhead-text">
     <nav class="crumb" aria-label="위치"><a href="/">홈</a><span aria-hidden="true">›</span><a href="/${cat.slug}/">${esc(cat.name)}</a></nav>
     <p class="kind">${esc(m.vendor || '')} ${esc(cat.name)}</p>
-    <h1 class="model">${esc(m.model)}</h1>
+    <h1 class="model" style="--len:${Math.max(6, [...m.model].length)}">${esc(m.model)}</h1>
     <p class="lead">${esc(summaryText(cat, m))}</p>
   </div>
   ${energyLabel(cat, m, kwh)}
@@ -359,7 +360,30 @@ ${pager}`;
 
 /* ---------- 홈 ---------- */
 
-export function homePage(summary, baseUrl, fetchedAt, examples = []) {
+function proofSection(pf) {
+  const { cat, bin, count, best, worst } = pf;
+  const yr = (m) => Math.round(monthlyKwh(cat, m.metric, m.cap) * RATE * 12);
+  const diff = yr(worst) - yr(best);
+  const row = (m, tone) => `<a class="pf-row pf-${tone}" href="/${cat.slug}/${m.slug}/">
+    <span class="pf-who">${chip(m.grade)}<b>${esc(m.model)}</b><small>${esc(m.vendor || '')}, ${capText(cat, m.cap)}</small></span>
+    <span class="pf-bar"><i style="width:${((m.metric / worst.metric) * 100).toFixed(1)}%"></i></span>
+    <span class="pf-val"><b>${fmt(m.metric, 1)}</b><small>kWh/월</small><em>연 ${n(yr(m))}원</em></span>
+  </a>`;
+  return `<section class="sec proof">
+  <div class="proof-text">
+    <h2>${worst.metric / best.metric >= 1.5 ? `같은 1등급인데 전기요금은 ${fmt(worst.metric / best.metric, 1)}배` : '같은 1등급이라도 전기요금은 다릅니다'}</h2>
+    <p class="lead">${esc(binLabel(cat, bin))} ${esc(cat.name)} 1등급 ${n(count)}개 중 가장 적게 쓰는 모델과 가장 많이 쓰는 모델입니다. 등급 숫자만 보지 말고 소비전력량과 용량대 순위를 함께 보세요.</p>
+    <p class="proof-links"><a href="/${cat.slug}/">${esc(cat.name)} 전체 보기</a><a href="/guide/label-cost/">요금 계산 기준</a></p>
+  </div>
+  <div class="proof-viz">
+    ${row(best, 'best')}
+    ${row(worst, 'worst')}
+    <p class="pf-diff"><span>1년 전기요금 차이</span><b>${n(diff)}<small>원</small></b></p>
+  </div>
+</section>`;
+}
+
+export function homePage(summary, baseUrl, fetchedAt, examples = [], proof = null) {
   const all = {};
   let total = 0;
   for (const s of summary) {
@@ -408,15 +432,7 @@ export function homePage(summary, baseUrl, fetchedAt, examples = []) {
   <ul class="catlist">${cats}</ul>
 </section>
 
-<section class="sec">
-  <h2>라벨만으로는 모르는 것</h2>
-  <dl class="method">
-    <div><dt>같은 1등급이라도 차이가 큽니다</dt><dd>등급은 구간일 뿐이라, 같은 용량대 1등급 안에서도 소비전력량이 두 배 가까이 나기도 합니다. 그래서 모델마다 용량대 안의 순위를 함께 보여줍니다.</dd></div>
-    <div><dt>전기요금은 라벨과 같은 방식으로</dt><dd>소비전력량에 라벨 단가인 1kWh당 ${RATE}원을 곱했습니다. 각 모델 페이지에서 단가와 사용 시간을 바꿔 다시 계산할 수 있습니다.</dd></div>
-    <div><dt>같은 모델도 등급이 바뀝니다</dt><dd>등급 기준이 강화되면 같은 제품도 다시 신고됩니다. 신고 이력을 모두 남겨 두었습니다.</dd></div>
-  </dl>
-  <p><a href="/guide/label-cost/">계산 기준 자세히 보기</a></p>
-</section>`;
+${proof ? proofSection(proof) : ''}`;
   return layout({
     title: `${site.name}: 모델명으로 찾는 가전 에너지등급과 전기요금`,
     description: `${names} ${n(total)}개 모델의 에너지소비효율등급, 소비전력량, 예상 전기요금, 같은 용량대 순위를 모델명으로 확인하세요. 한국에너지공단 공공데이터 기반.`,

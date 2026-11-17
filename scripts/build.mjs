@@ -104,7 +104,22 @@ const examples = data
   .filter(Boolean)
   .map((m) => ({ cat: data.find((d) => d.models.includes(m)).cat.slug, slug: m.slug, model: m.model }));
 
-writeText(path.join(dist, 'index.html'), homePage(summary, baseUrl, meta.fetchedAt, examples));
+// 홈 비교: 냉장고에서 1등급이 가장 많은 용량대의 최저·최고 소비전력 모델
+let proof = null;
+const fridge = data.find((d) => d.cat.slug === 'refrigerator') || data[0];
+if (fridge) {
+  let top = null;
+  for (const [bin, list] of fridge.bins) {
+    const g1 = list.filter((m) => m.grade === 1 && m.hasPage && m.metric > 0);
+    if (g1.length >= 2 && (!top || g1.length > top.list.length)) top = { bin, list: g1 };
+  }
+  if (top) {
+    const sorted = [...top.list].sort((a, b) => a.metric - b.metric);
+    proof = { cat: fridge.cat, bin: top.bin, count: sorted.length, best: sorted[0], worst: sorted[sorted.length - 1] };
+  }
+}
+
+writeText(path.join(dist, 'index.html'), homePage(summary, baseUrl, meta.fetchedAt, examples, proof));
 writeText(path.join(dist, 'guide', 'label-cost', 'index.html'), guidePage(baseUrl));
 writeText(path.join(dist, '404.html'), notFoundPage(baseUrl));
 

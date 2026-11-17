@@ -89,6 +89,14 @@
     document.addEventListener('click', function (e) {
       if (!e.target.closest('.search')) box.hidden = true;
     });
+    // '/' 키로 검색창 이동
+    document.addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !t.isContentEditable) {
+        e.preventDefault();
+        input.focus();
+      }
+    });
   }
 
   // ---- 요금 계산기 ----
