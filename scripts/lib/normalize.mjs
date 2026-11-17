@@ -40,6 +40,15 @@ export function binLabel(cat, i) {
   return `${bins[i - 1]}~${bins[i]}${unit}`;
 }
 
+/** 용량대 URL 조각: under-200, 200-300, 900-plus */
+export function binSlug(cat, i) {
+  const { bins } = cat.capacity;
+  if (i < 0) return 'unknown';
+  if (i === 0) return `under-${bins[0]}`;
+  if (i === bins.length) return `${bins[bins.length - 1]}-plus`;
+  return `${bins[i - 1]}-${bins[i]}`;
+}
+
 /** 표준 조건 기준 월 소비전력량(kWh). 세탁기·TV·공기청정기는 사용량 가정이 들어간다. */
 export function monthlyKwh(cat, metric, cap, usage = site.usageDefaults) {
   if (metric === null) return null;

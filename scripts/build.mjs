@@ -4,8 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { site, categories, p, readJson, writeJson, writeText, countFiles, esc } from './lib/util.mjs';
-import { normalizeCategory } from './lib/normalize.mjs';
-import { modelPage, listPage, homePage, guidePage, notFoundPage, setAssetVersion } from './lib/templates.mjs';
+import { normalizeCategory, binLabel, binSlug } from './lib/normalize.mjs';
+import { modelPage, listPage, sizePage, comparePage, homePage, guidePage, notFoundPage, setAssetVersion } from './lib/templates.mjs';
 import crypto from 'node:crypto';
 
 const useFixtures = process.argv.includes('--fixtures');
@@ -68,11 +68,52 @@ for (const { cat, models, bins, stats } of data) {
 
   const gradeCounts = {};
   for (const m of models) if (m.grade) gradeCounts[m.grade] = (gradeCounts[m.grade] || 0) + 1;
+
+  // 용량대 목록과 업체 목록 (필터·순위 페이지용)
+  const binLinks = [...bins]
+    .sort((a, b) => a[0] - b[0])
+    .map(([i, list]) => ({ i, label: binLabel(cat, i), slug: binSlug(cat, i), count: list.length }));
+  const vendorCount = new Map();
+  for (const m of models) if (m.vendor) vendorCount.set(m.vendor, (vendorCount.get(m.vendor) || 0) + 1);
+  const vendors = [...vendorCount]
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 40)
+    .map(([name, count]) => ({ name, count }));
+
+  // 용량대별 순위 페이지
+  for (const [i, list] of bins) {
+    const slug = binSlug(cat, i);
+    writeText(path.join(dist, cat.slug, 'size', slug, 'index.html'), sizePage(cat, i, list, binLinks, baseUrl, meta.fetchedAt));
+    urls.push(`/${cat.slug}/size/${slug}/`);
+  }
+
+  // 필터·비교용 품목 데이터
+  const binCount = cat.capacity.bins.length + 1;
+  writeJson(path.join(dist, 'data', `${cat.slug}.json`), {
+    slug: cat.slug,
+    name: cat.name,
+    model: cat.energy.model,
+    seasonal: !!cat.energy.seasonal,
+    usageDefault:
+      cat.energy.model === 'wh_per_cycle'
+        ? site.usageDefaults.cyclesPerMonth
+        : cat.energy.model === 'watt'
+          ? site.usageDefaults.tvHoursPerDay
+          : site.usageDefaults.purifierHoursPerDay,
+    capLabel: cat.capacity.label,
+    capUnit: cat.capacity.unit,
+    metricLabel: cat.energy.label,
+    metricUnit: cat.energy.unit,
+    bins: Array.from({ length: binCount }, (_, i) => ({ label: binLabel(cat, i), slug: binSlug(cat, i) })),
+    // [모델명, slug(페이지 없으면 ''), 업체, 등급, 용량, 지표, 출하예정일, 용량대, 순위, 용량대 모델 수]
+    rows: models.map((m) => [m.model, m.hasPage ? m.slug : '', m.vendor || '', m.grade || 0, m.cap, m.metric, m.ship || '', m.bin, m.rank || 0, m.binSize || 0]),
+  });
   const pages = Math.max(1, Math.ceil(models.length / site.listPageSize));
   for (let page = 1; page <= pages; page++) {
     const slice = models.slice((page - 1) * site.listPageSize, page * site.listPageSize);
     const file = page === 1 ? path.join(dist, cat.slug, 'index.html') : path.join(dist, cat.slug, 'page', String(page), 'index.html');
-    writeText(file, listPage(cat, slice, page, pages, models.length, gradeCounts, baseUrl));
+    writeText(file, listPage(cat, slice, page, pages, models.length, gradeCounts, baseUrl, binLinks, vendors));
     if (page > 1) urls.push(`/${cat.slug}/page/${page}/`);
   }
 
@@ -121,6 +162,7 @@ if (fridge) {
 
 writeText(path.join(dist, 'index.html'), homePage(summary, baseUrl, meta.fetchedAt, examples, proof));
 writeText(path.join(dist, 'guide', 'label-cost', 'index.html'), guidePage(baseUrl));
+writeText(path.join(dist, 'compare', 'index.html'), comparePage(baseUrl));
 writeText(path.join(dist, '404.html'), notFoundPage(baseUrl));
 
 writeText(
@@ -140,7 +182,7 @@ writeText(path.join(dist, '_headers'), `/assets/*\n  Cache-Control: public, max-
 fs.mkdirSync(path.join(dist, 'assets'), { recursive: true });
 const cats = JSON.stringify(categories.map((c) => [c.slug, c.name]));
 fs.copyFileSync(p('src', 'static', 'style.css'), path.join(dist, 'assets', 'style.css'));
-writeText(path.join(dist, 'assets', 'app.js'), `window.__CATS__=${cats};\n${fs.readFileSync(p('src', 'static', 'app.js'), 'utf8')}`);
+writeText(path.join(dist, 'assets', 'app.js'), `window.__CATS__=${cats};window.__RATE__=${site.labelRateWonPerKwh};\n${fs.readFileSync(p('src', 'static', 'app.js'), 'utf8')}`);
 
 // 4) 검사용 리포트 (dist 밖에 저장)
 const fileCount = countFiles(dist);

@@ -1,5 +1,5 @@
 import { site, categories, esc, fmt } from './util.mjs';
-import { binLabel, monthlyKwh } from './normalize.mjs';
+import { binLabel, binSlug, monthlyKwh } from './normalize.mjs';
 
 const RATE = site.labelRateWonPerKwh;
 const U = site.usageDefaults;
@@ -96,6 +96,7 @@ ${body}
     <p>전기요금은 표준 시험 조건에서 잰 소비전력량으로 계산한 참고값이라, 누진제가 붙는 실제 청구액과 다릅니다. <a href="/guide/label-cost/">계산 기준 보기</a></p>
   </div>
 </footer>
+<div id="tray" class="tray" hidden></div>
 </body>
 </html>
 `;
@@ -262,6 +263,11 @@ export function modelPage(cat, m, alts, baseUrl, fetchedAt) {
     <p class="kind">${esc(m.vendor || '')} ${esc(cat.name)}</p>
     <h1 class="model" style="--len:${Math.max(6, [...m.model].length)}">${esc(m.model)}</h1>
     <p class="lead">${esc(summaryText(cat, m))}</p>
+    <div class="actions">
+      <button type="button" class="btn btn-primary btn-cmp" data-cmp="${cat.slug}/${m.slug}" data-name="${esc(m.model)}" aria-pressed="false" hidden>비교함에 담기</button>
+      <a class="btn" href="https://search.shopping.naver.com/search/all?query=${encodeURIComponent(m.model)}" target="_blank" rel="nofollow noopener">네이버쇼핑 가격</a>
+      <a class="btn" href="https://search.danawa.com/dsearch.php?query=${encodeURIComponent(m.model)}" target="_blank" rel="nofollow noopener">다나와 가격</a>
+    </div>
   </div>
   ${energyLabel(cat, m, kwh)}
 </div>
@@ -270,6 +276,7 @@ export function modelPage(cat, m, alts, baseUrl, fetchedAt) {
   <section class="sec">
     <h2>같은 용량대에서의 위치</h2>
     ${histogram(cat, m) || '<p class="sec-lead">비교할 같은 용량대 모델이 부족합니다.</p>'}
+    ${m.rank ? `<p class="more"><a href="/${cat.slug}/size/${binSlug(cat, m.bin)}/">${esc(binLabel(cat, m.bin))} ${esc(cat.name)} 순위 전체 보기</a></p>` : ''}
   </section>
   <section class="sec">
     <h2>내 조건으로 전기요금 계산</h2>
@@ -319,42 +326,151 @@ function gradeBar(counts, { compact = false } = {}) {
   return `<div class="gbar${compact ? ' gbar-compact' : ''}" role="img" aria-label="${label}">${segs}</div>`;
 }
 
-export function listPage(cat, models, page, pages, total, gradeCounts, baseUrl) {
-  const url = page === 1 ? `/${cat.slug}/` : `/${cat.slug}/page/${page}/`;
+/** 목록·순위 표의 한 줄. 열 구성은 app.js 의 renderRow 와 같아야 한다. */
+function listRow(cat, m, { rank = false } = {}) {
+  const kwh = monthlyKwh(cat, m.metric, m.cap);
+  const name = m.hasPage ? `<a href="/${cat.slug}/${m.slug}/">${esc(m.model)}</a>` : esc(m.model);
+  const cmp = m.hasPage
+    ? `<button type="button" class="cmp-btn" data-cmp="${cat.slug}/${m.slug}" data-name="${esc(m.model)}" aria-pressed="false" hidden>비교</button>`
+    : '';
+  return `<tr>${rank ? `<td class="num c-rank">${n(m.rank)}</td>` : ''}<td class="cell-model">${name}<small>${esc(m.vendor || '-')}</small></td><td>${chip(m.grade)}</td><td class="num c-cap">${capText(cat, m.cap)}</td><td class="num c-metric">${fmt(m.metric, 2)}</td><td class="num c-cost">${kwh === null ? '-' : `${n(Math.round(kwh * RATE))}원`}</td>${rank ? '' : `<td class="num dim c-ship">${esc(m.ship || '-')}</td>`}<td class="c-cmp">${cmp}</td></tr>`;
+}
+
+function tableHead(cat, { rank = false } = {}) {
   const seasonal = !!cat.energy.seasonal;
-  const rows = models
-    .map((m) => {
-      const kwh = monthlyKwh(cat, m.metric, m.cap);
-      const name = m.hasPage ? `<a href="/${cat.slug}/${m.slug}/">${esc(m.model)}</a>` : esc(m.model);
-      return `<tr><td class="cell-model">${name}<small>${esc(m.vendor || '-')}</small></td><td>${chip(m.grade)}</td><td class="num">${capText(cat, m.cap)}</td><td class="num">${fmt(m.metric, 2)}</td><td class="num">${kwh === null ? '-' : `${n(Math.round(kwh * RATE))}원`}</td><td class="num dim">${esc(m.ship || '-')}</td></tr>`;
-    })
-    .join('');
+  return `<thead><tr>${rank ? '<th class="num c-rank">순위</th>' : ''}<th>모델</th><th>등급</th><th class="num c-cap">${esc(cat.capacity.label)}</th><th class="num c-metric">${esc(cat.energy.label)}<small>${esc(cat.energy.unit)}</small></th><th class="num c-cost">${seasonal ? '냉방기간 월 요금' : '월 요금'}</th>${rank ? '' : '<th class="num c-ship">출하예정일</th>'}<th class="c-cmp"><span class="sr">비교</span></th></tr></thead>`;
+}
+
+function sizeNav(cat, binLinks, current = null) {
+  if (!binLinks.length) return '';
+  return `<nav class="sizes" aria-label="용량대별 순위">
+  <p class="sizes-title">용량대별 전기 적게 쓰는 순위</p>
+  <ul>${binLinks
+    .map(
+      (b) =>
+        `<li><a href="/${cat.slug}/size/${b.slug}/"${current === b.i ? ' aria-current="page"' : ''}><b>${esc(b.label)}</b><span>${n(b.count)}개</span></a></li>`,
+    )
+    .join('')}</ul>
+</nav>`;
+}
+
+export function listPage(cat, models, page, pages, total, gradeCounts, baseUrl, binLinks = [], vendors = []) {
+  const url = page === 1 ? `/${cat.slug}/` : `/${cat.slug}/page/${page}/`;
+  const rows = models.map((m) => listRow(cat, m)).join('');
   const link = (p) => (p === 1 ? `/${cat.slug}/` : `/${cat.slug}/page/${p}/`);
   const pager =
     pages > 1
       ? `<nav class="pager" aria-label="쪽 이동">${page > 1 ? `<a href="${link(page - 1)}" rel="prev">이전 쪽</a>` : '<span></span>'}<span>${page} / ${pages}쪽</span>${page < pages ? `<a href="${link(page + 1)}" rel="next">다음 쪽</a>` : '<span></span>'}</nav>`
       : '';
   const legend = [1, 2, 3, 4, 5].map((g) => `<li>${chip(g)}<span>${n(gradeCounts[g] || 0)}개</span></li>`).join('');
+  const filters = `<form class="filters" id="filters" data-cat="${cat.slug}" data-page="${page}" onsubmit="return false" hidden>
+  <div class="f-grades" role="group" aria-label="등급">${[1, 2, 3, 4, 5]
+    .map((g) => `<button type="button" class="f-grade" data-g="${g}" aria-pressed="false">${chip(g)}<span>${g}등급</span></button>`)
+    .join('')}</div>
+  <div class="f-selects">
+    <label class="f-field"><span>용량대</span><select name="b"><option value="">전체</option>${binLinks
+      .map((b) => `<option value="${b.i}">${esc(b.label)} (${n(b.count)})</option>`)
+      .join('')}</select></label>
+    <label class="f-field"><span>업체</span><select name="v"><option value="">전체</option>${vendors
+      .map((v) => `<option value="${esc(v.name)}">${esc(v.name)} (${n(v.count)})</option>`)
+      .join('')}</select></label>
+    <label class="f-field"><span>정렬</span><select name="s"><option value="new">최근 출하 순</option><option value="eff">${esc(cat.energy.label)} 낮은 순</option><option value="effd">${esc(cat.energy.label)} 높은 순</option><option value="cap">${esc(cat.capacity.label)} 큰 순</option></select></label>
+  </div>
+  <p class="f-count" id="f-count" aria-live="polite"></p>
+</form>`;
   const body = `
 <header class="lhead">
   <nav class="crumb" aria-label="위치"><a href="/">홈</a><span aria-hidden="true">›</span>${esc(cat.name)}</nav>
   <h1>${esc(cat.name)} <span class="lhead-count">${n(total)}개 모델</span></h1>
-  <p class="lead">한국에너지공단에 신고된 ${esc(cat.official)}를 출하예정일이 최근인 순서로 보여줍니다. 모델명을 누르면 같은 용량대 안에서의 순위와 예상 전기요금을 볼 수 있습니다.</p>
+  <p class="lead">한국에너지공단에 신고된 ${esc(cat.official)} 전체입니다. 등급, 용량대, 업체로 좁히고 소비전력이 낮은 순으로 정렬해 보세요. 마음에 드는 모델은 비교함에 담아 나란히 비교할 수 있습니다.</p>
   ${gradeBar(gradeCounts)}
   <ul class="gbar-legend">${legend}</ul>
 </header>
+${sizeNav(cat, binLinks)}
+${filters}
 <div class="tbl-wrap"><table class="tbl tbl-list">
-  <thead><tr><th>모델</th><th>등급</th><th class="num">${esc(cat.capacity.label)}</th><th class="num">${esc(cat.energy.label)}<small>${esc(cat.energy.unit)}</small></th><th class="num">${seasonal ? '냉방기간 월 요금' : '월 요금'}</th><th class="num">출하예정일</th></tr></thead>
-  <tbody>${rows}</tbody>
+  ${tableHead(cat)}
+  <tbody id="list-body">${rows}</tbody>
 </table></div>
+<button type="button" id="list-more" class="more-btn" hidden>더 보기</button>
 ${pager}`;
   return layout({
     title: `${cat.name} 에너지등급·소비전력 목록${page > 1 ? ` (${page}쪽)` : ''} | ${site.name}`,
-    description: `${cat.name} ${n(total)}개 모델의 에너지소비효율등급, ${cat.energy.label}, ${cat.capacity.label}, 예상 전기요금을 모델별로 확인하세요.`,
+    description: `${cat.name} ${n(total)}개 모델의 에너지소비효율등급, ${cat.energy.label}, ${cat.capacity.label}, 예상 전기요금을 등급·용량대·업체별로 찾아보세요.`,
     canonical: url,
     body,
     baseUrl,
     active: cat.slug,
+  });
+}
+
+/* ---------- 용량대별 순위 ---------- */
+
+export function sizePage(cat, binIndex, list, binLinks, baseUrl, fetchedAt) {
+  const label = binLabel(cat, binIndex);
+  const best = list[0];
+  const worst = list[list.length - 1];
+  const g1 = list.filter((m) => m.grade === 1).length;
+  const seasonal = !!cat.energy.seasonal;
+  const yr = (m) => {
+    const k = monthlyKwh(cat, m.metric, m.cap);
+    return k === null ? null : k * RATE * (seasonal ? 1 : 12);
+  };
+  const gap = list.length >= 2 && yr(worst) !== null && yr(best) !== null ? yr(worst) - yr(best) : null;
+  const summary =
+    gap !== null
+      ? `1위 ${best.model}(${fmt(best.metric, 2)}${cat.energy.unit})와 마지막 ${worst.model}(${fmt(worst.metric, 2)}${cat.energy.unit})은 ${seasonal ? '냉방기간 한 달' : '1년'} 전기요금이 약 ${n(Math.round(gap))}원 차이 납니다.`
+      : '';
+  const body = `
+<header class="lhead">
+  <nav class="crumb" aria-label="위치"><a href="/">홈</a><span aria-hidden="true">›</span><a href="/${cat.slug}/">${esc(cat.name)}</a><span aria-hidden="true">›</span>${esc(label)}</nav>
+  <h1>${esc(label)} ${esc(cat.name)} <span class="lhead-count">전기 적게 쓰는 순위</span></h1>
+  <p class="lead">${esc(label)} ${esc(cat.official)} ${n(list.length)}개를 ${esc(cat.energy.label)}이 낮은 순서로 줄 세웠습니다. 이 중 1등급은 ${n(g1)}개입니다. ${esc(summary)}</p>
+</header>
+${sizeNav(cat, binLinks, binIndex)}
+<div class="tbl-wrap"><table class="tbl tbl-list tbl-rank">
+  ${tableHead(cat, { rank: true })}
+  <tbody>${list.map((m) => listRow(cat, m, { rank: true })).join('')}</tbody>
+</table></div>
+<p class="stamp">데이터 기준일 ${esc(fetchedAt.slice(0, 10))}. 요금은 ${esc(usageNote(cat))} 기준, 1kWh당 ${RATE}원입니다.</p>`;
+  return layout({
+    title: `${label} ${cat.name} 소비전력 순위, 전기 적게 쓰는 모델 | ${site.name}`,
+    description: `${label} ${cat.name} ${n(list.length)}개 모델을 ${cat.energy.label}이 낮은 순서로 정리했습니다. 1위 ${best.model}, 1등급 ${n(g1)}개.`,
+    canonical: `/${cat.slug}/size/${binSlug(cat, binIndex)}/`,
+    body,
+    baseUrl,
+    active: cat.slug,
+  });
+}
+
+/* ---------- 비교 ---------- */
+
+export function comparePage(baseUrl) {
+  const body = `
+<header class="lhead">
+  <nav class="crumb" aria-label="위치"><a href="/">홈</a><span aria-hidden="true">›</span>모델 비교</nav>
+  <h1>모델 비교</h1>
+  <p class="lead">후보 모델을 최대 4개까지 나란히 놓고 등급, 소비전력량, 1년과 10년 전기요금 차이를 비교합니다.</p>
+</header>
+<div id="compare" class="compare">
+  <div class="cmp-tools">
+    <div class="search search-add" role="search">
+      <label class="sr" for="cmp-q">비교할 모델 추가</label>
+      <svg class="search-ico" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.75" fill="none" stroke="currentColor" stroke-width="2"/><path d="m13 13 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input type="search" id="cmp-q" placeholder="비교할 모델명 추가" autocomplete="off" spellcheck="false">
+      <div id="cmp-results" class="results" hidden></div>
+    </div>
+    <label class="cmp-rate">전기요금 1kWh당 <input type="number" id="cmp-rate" inputmode="numeric" value="${RATE}" min="0" step="1"> 원</label>
+  </div>
+  <div id="cmp-body"><p class="sec-lead">비교 기능은 자바스크립트를 켜야 동작합니다.</p></div>
+</div>`;
+  return layout({
+    title: `모델 비교 | ${site.name}`,
+    description: '가전 후보 모델의 에너지등급, 소비전력량, 1년과 10년 전기요금 차이를 나란히 비교합니다.',
+    canonical: '/compare/',
+    noindex: true,
+    body,
+    baseUrl,
   });
 }
 
@@ -373,7 +489,7 @@ function proofSection(pf) {
   <div class="proof-text">
     <h2>${worst.metric / best.metric >= 1.5 ? `같은 1등급인데 전기요금은 ${fmt(worst.metric / best.metric, 1)}배` : '같은 1등급이라도 전기요금은 다릅니다'}</h2>
     <p class="lead">${esc(binLabel(cat, bin))} ${esc(cat.name)} 1등급 ${n(count)}개 중 가장 적게 쓰는 모델과 가장 많이 쓰는 모델입니다. 등급 숫자만 보지 말고 소비전력량과 용량대 순위를 함께 보세요.</p>
-    <p class="proof-links"><a href="/${cat.slug}/">${esc(cat.name)} 전체 보기</a><a href="/guide/label-cost/">요금 계산 기준</a></p>
+    <p class="proof-links"><a href="/compare/?m=${cat.slug}/${best.slug},${cat.slug}/${worst.slug}">두 모델 나란히 비교</a><a href="/${cat.slug}/size/${binSlug(cat, bin)}/">${esc(binLabel(cat, bin))} 순위 보기</a></p>
   </div>
   <div class="proof-viz">
     ${row(best, 'best')}
