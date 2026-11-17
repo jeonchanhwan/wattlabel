@@ -5,6 +5,10 @@ const RATE = site.labelRateWonPerKwh;
 const U = site.usageDefaults;
 const n = (v) => Number(v).toLocaleString('ko-KR');
 
+// CSS·JS 캐시 무효화용 버전 (빌드가 파일 내용 해시로 설정)
+let ASSET_VER = '';
+export const setAssetVersion = (v) => (ASSET_VER = v);
+
 /** 순위를 '상위 n%' 또는 하위권이면 '하위 n%' 로 표현 */
 const rankText = (m) => {
   const top = Math.max(1, Math.ceil((m.rank / m.binSize) * 100));
@@ -70,8 +74,8 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/style.css">
-<script src="/assets/app.js" defer></script>
+<link rel="stylesheet" href="/assets/style.css?v=${ASSET_VER}">
+<script src="/assets/app.js?v=${ASSET_VER}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">본문 바로가기</a>

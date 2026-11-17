@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { site, categories, p, readJson, writeJson, writeText, countFiles, esc } from './lib/util.mjs';
 import { normalizeCategory } from './lib/normalize.mjs';
-import { modelPage, listPage, homePage, guidePage, notFoundPage } from './lib/templates.mjs';
+import { modelPage, listPage, homePage, guidePage, notFoundPage, setAssetVersion } from './lib/templates.mjs';
+import crypto from 'node:crypto';
 
 const useFixtures = process.argv.includes('--fixtures');
 const dataDir = useFixtures ? p('fixtures') : p('data');
@@ -20,6 +21,17 @@ if (!fs.existsSync(rawDir)) {
 const meta = fs.existsSync(path.join(dataDir, 'meta.json'))
   ? readJson(path.join(dataDir, 'meta.json'))
   : { source: 'unknown', fetchedAt: new Date().toISOString() };
+
+// CSS·JS 내용이 바뀌면 URL 이 바뀌도록 해시를 붙인다 (_headers 의 하루 캐시 대응)
+setAssetVersion(
+  crypto
+    .createHash('sha1')
+    .update(fs.readFileSync(p('src', 'static', 'style.css')))
+    .update(fs.readFileSync(p('src', 'static', 'app.js')))
+    .update(JSON.stringify(categories.map((c) => [c.slug, c.name])))
+    .digest('hex')
+    .slice(0, 10),
+);
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
